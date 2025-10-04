@@ -1,21 +1,26 @@
-# Container con Nginx + MinIO
 FROM ubuntu:22.04
 
-# Non-interattivo
 ENV DEBIAN_FRONTEND=noninteractive
-
-# Dipendenze: nginx, curl, ca-certificates, dumb-init
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    nginx curl ca-certificates dumb-init \
+    nginx curl ca-certificates dumb-init gettext-base \
   && rm -rf /var/lib/apt/lists/*
 
-mkdir -p ~/minio/data
+# MinIO server
+RUN curl -fsSL https://dl.min.io/server/minio/release/linux-amd64/minio \
+    -o /usr/local/bin/minio \
+ && chmod +x /usr/local/bin/minio
 
-docker run \
-   -p 9000:9000 \
-   -p 9001:9001 \
-   --name minio \
-   -v ~/minio/data:/data \
-   -e "MINIO_ROOT_USER=ROOTNAME" \
-   -e "MINIO_ROOT_PASSWORD=CHANGEME123" \
-   quay.io/minio/minio server /data --console-address ":9001"
+RUN mkdir -p /data /var/log/minio
+ENV PORT=8080
+COPY nginx.conf.template /etc/nginx/templates/nginx.conf.template
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENV MINIO_ADDRESS=:9000
+ENV MINIO_CONSOLE_ADDRESS=:9001
+
+EXPOSE 8080
+VOLUME ["/data"]
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["/entrypoint.sh"]
